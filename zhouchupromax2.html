@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+<title>周处除三害 </title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:"KaiTi","STKaiti",serif;}
+body{background:#141210;color:#f3e9d8;overflow:hidden;}
+.wrap{width:100vw;height:100vh;position:relative;}
+.scroll-panel{
+  background:linear-gradient(#f6efe0,#e9ddc7,#f6efe0);
+  color:#332b20;
+  border:3px solid #8c6c42;
+  border-radius:8px;
+  padding:24px;
+  box-shadow:0 0 20px #0005;
+  max-width:90%;
+  max-height:80vh;
+  overflow:auto;
+}
+.title{font-size:clamp(2rem,6vw,3.2rem);text-align:center;margin-bottom:16px;font-weight:bold;}
+.subtitle{text-align:center;font-size:1.1rem;margin-bottom:24px;color:#554433;}
+.btn-group{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:20px;}
+button{
+  padding:12px 24px;font-size:1.1rem;border:2px solid #705536;
+  background:#f0e4ce;color:#33271a;border-radius:6px;cursor:pointer;transition:0.2s;
+}
+button:hover{background:#ddc9a8;}
+button:disabled{opacity:0.5;cursor:not-allowed;}
+.page{display:none;width:100%;height:100%;align-items:center;justify-content:center;flex-direction:column;padding:20px;}
+.page.active{display:flex;}
+#gameCanvas{border:2px solid #705536;background:#222;border-radius:6px;max-width:100%;max-height:60vh;}
+.game-ui-bar{width:min(720px,95%);display:flex;justify-content:space-between;padding:10px 4px;margin:8px 0;flex-wrap:wrap;gap:8px;}
+.tip-text{margin-top:6px;font-size:1rem;color:#f3e9d8;text-align:center;min-height:32px;}
+.progress{width:140px;height:18px;border:1px solid #aaa;background:#222;border-radius:9px;overflow:hidden;}
+.progress>div{height:100%;width:0%;transition:0.25s;}
+.hp-bar{background:#c84c4c;}
+.stagger-bar{background:#9c58c8;}
+.sp-bar{background:#4c98c8;}
+.info-card{margin-top:16px;line-height:1.7;font-size:1rem;}
+.modal{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:10;}
+.modal.show{display:flex;}
+.modal-content{background:#f6efe0;color:#332b20;padding:30px;border-radius:8px;border:3px solid #8c6c42;text-align:center;}
+.skill-card{
+  display:inline-block;padding:8px 12px;margin:4px;border:2px solid #776;
+  background:#3a342c;border-radius:6px;color:#fff;cursor:pointer;
+  position:relative;
+}
+.skill-card.selected{border-color:#ffd343;background:#524938;}
+
+/* ========== 技能悬浮提示面板 ========== */
+.skill-tip{
+  position:absolute;
+  left:105%;
+  top:0;
+  width:260px;
+  background:rgba(22,20,18,0.94);
+  border:2px solid #8c6c42;
+  border-radius:7px;
+  padding:10px;
+  color:#f3e9d8;
+  font-size:0.9rem;
+  line-height:1.5;
+  z-index:20;
+  pointer-events:none;
+  display:none;
+}
+.skill-tip h4{color:#ffd390;margin-bottom:4px;font-size:1rem;}
+.skill-tip .tag{color:#ffb860;}
+.skill-tip .warn{color:#ff7777;}
+.skill-card:hover .skill-tip{display:block;}
+
+/* ========== 状态栏样式 ========== */
+.status-wrap{
+  width:min(720px,95%);display:flex;gap:12px;margin:6px 0;flex-wrap:wrap;
+}
+.status-block{
+  flex:1;min-width:260px;background:#25221e;border:1px solid #665544;border-radius:6px;padding:8px;
+}
+.status-block h4{font-size:0.95rem;margin-bottom:6px;color:#ffd390;display:flex;justify-content:space-between;}
+.status-tag{
+  display:inline-flex;align-items:center;gap:4px;padding:3px 7px;margin:3px;border-radius:4px;border:1px solid #444;
+  font-size:0.8rem;color:#fff;position:relative;
+}
+.status-tag .dot{width:8px;height:8px;border-radius:50%;}
+.status-tag:hover::after{
+  content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);
+  white-space:nowrap;background:#111;color:#fff;padding:4px 6px;border-radius:3px;font-size:0.75rem;z-index:5;
+}
+.no-status{color:#999;font-size:0.85rem;}
+
+/* ========== 战斗统计面板 ========== */
+.stat-panel{
+  width:min(720px,95%);background:#201d1a;border:1px solid #554433;border-radius:6px;padding:8px;margin:6px 0;
+}
+.stat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.stat-head h4{color:#ffd390;}
+#toggleStat{padding:4px 8px;font-size:0.85rem;}
+.stat-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:0.85rem;display:none;
+}
+.stat-grid.show{display:grid;}
+.stat-item{background:#2c2823;padding:4px 6px;border-radius:4px;}
+.stat-log{
+  width:min(720px,95%);height:90px;background:#1a1815;border:1px solid #44382b;border-radius:6px;padding:6px;
+  overflow-y:auto;font-size:0.8rem;color:#ddd;line-height:1.3;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="page-home" class="page active">
+    <div class="scroll-panel">
+      <div class="title">周处除三害</div>
+      <div class="subtitle">国风拼点战斗 · 边狱巴士风格硬币拼点</div>
+      <p style="line-height:1.7;font-size:1rem;">
+        西晋义兴，有三害：南山猛虎、长桥蛟龙、乡里恶少周处。<br>
+        掷硬币拼点对抗强敌，理智SP决定硬币正反面；SP过低陷入【混乱Panic】。<br>
+        流血、震颤、脆弱等状态会持续干扰战斗；将敌人打至崩解Stagger可造成高额伤害。
+      </p>
+      <div class="btn-group">
+        <button onclick="showPage('page-story')">故事简介</button>
+        <button onclick="startGame()">开始战斗</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-story" class="page">
+    <div class="scroll-panel">
+      <div class="title">典故原文与寓意</div>
+      <div class="info-card">
+        <p>《世说新语》记载：周处年少时，凶强侠气，为乡里所患。又义兴水中有蛟，山中有白额虎，并皆暴犯百姓，义兴人谓为三横，而处尤剧。</p>
+        <br>
+        <p>或说处杀虎斩蛟，实冀三横唯余其一。处即刺杀虎，又入水击蛟。蛟或浮或没，行数十里，处与之俱。经三日三夜，乡里皆谓已死，更相庆。</p>
+        <br>
+        <p>竟杀蛟而出，闻里人相庆，始知为人情所患，有自改意。乃入吴寻二陆。陆云劝其立志，处遂改励，终为忠臣孝子。</p>
+        <br>
+        <p><b>寓意：</b>知错能改，善莫大焉。战胜外在的祸害容易，战胜自己的心魔最难。</p>
+      </div>
+      <div class="btn-group">
+        <button onclick="showPage('page-home')">返回首页</button>
+        <button onclick="startGame()">开始战斗</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-game" class="page">
+    <canvas id="gameCanvas" width="720" height="380"></canvas>
+    <div class="game-ui-bar">
+      <div>
+        <span>生命值</span>
+        <div class="progress"><div id="hpBar" class="hp-bar"></div></div>
+      </div>
+      <div>
+        <span>崩解Stagger</span>
+        <div class="progress"><div id="staggerBar" class="stagger-bar"></div></div>
+      </div>
+      <div>
+        <span>理智SP</span>
+        <div class="progress"><div id="spBar" class="sp-bar"></div></div>
+      </div>
+      <div>关卡：<span id="levelName">进山伏虎</span></div>
+      <div>
+        <button onclick="pauseGame()">暂停</button>
+      </div>
+    </div>
+    <div class="tip-text" id="gameTip">选择技能，点击敌方技能进行拼点配对，再执行回合</div>
+
+    <!-- 双栏状态栏 -->
+    <div class="status-wrap">
+      <div class="status-block">
+        <h4>🗡️ 周处</h4>
+        <div id="playerStatusBox"></div>
+      </div>
+      <div class="status-block">
+        <h4>👹 敌方</h4>
+        <div id="enemyStatusBox"></div>
+      </div>
+    </div>
+
+    <!-- 战斗统计面板（可折叠） -->
+    <div class="stat-panel">
+      <div class="stat-head">
+        <h4>📊 战斗统计</h4>
+        <button id="toggleStat" onclick="toggleStat()">展开统计</button>
+      </div>
+      <div class="stat-grid" id="statGrid">
+        <div class="stat-item">总输出：<span id="statDmgOut">0</span></div>
+        <div class="stat-item">总承伤：<span id="statDmgIn">0</span></div>
+        <div class="stat-item">拼点胜：<span id="statWin">0</span></div>
+        <div class="stat-item">拼点负：<span id="statLose">0</span></div>
+        <div class="stat-item">拼点平：<span id="statDraw">0</span></div>
+        <div class="stat-item">崩解触发：<span id="statStagger">0</span></div>
+        <div class="stat-item">SP总变化：<span id="statSpDelta">0</span></div>
+        <div class="stat-item">回合数：<span id="statRound">0</span></div>
+      </div>
+    </div>
+
+    <!-- 战斗日志 -->
+    <div class="stat-log" id="battleLog"></div>
+
+    <div id="skillPanel" style="margin:8px 0;"></div>
+    <div class="btn-group">
+      <button id="btnExecute" onclick="executeRound()" disabled>执行回合</button>
+      <button onclick="clearPair()">清空配对</button>
+      <button onclick="backHome()">返回首页</button>
+    </div>
+  </div>
+
+  <div id="page-end" class="page">
+    <div class="scroll-panel">
+      <div class="title">除尽三害 · 改过自新</div>
+      <div class="info-card">
+        <p>周处除掉猛虎、斩杀蛟龙，最后破除心中顽劣的心魔。</p>
+        <p>乡邻不再畏惧他，他立志修身立德，向善而行。</p>
+        <br>
+        <p>✨ 本游戏取材自《世说新语·自新》</p>
+        <p>犯错并不可怕，敢于正视自己、愿意改变，就是最了不起的勇气。</p>
+      </div>
+      <div class="btn-group">
+        <button onclick="restartGame()">再玩一次</button>
+        <button onclick="showPage('page-home')">返回首页</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="failModal" class="modal">
+    <div class="modal-content">
+      <h2>挑战失败</h2>
+      <p>周处力竭倒下，再试一次吧！</p>
+      <div class="btn-group">
+        <button onclick="restartGame()">重新挑战</button>
+        <button onclick="backHome();closeModal()">返回首页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const pages = ['page-home','page-story','page-game','page-end'];
+function showPage(id){pages.forEach(p=>document.getElementById(p).classList.remove('active'));document.getElementById(id).classList.add('active');}
+function closeModal(){document.getElementById('failModal').classList.remove('show');}
+let statOpen = false;
+function toggleStat(){
+  statOpen = !statOpen;
+  document.getElementById("statGrid").classList.toggle("show",statOpen);
+  document.getElementById("toggleStat").innerText = statOpen ? "收起统计" : "展开统计";
+}
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let gameRunning = false;
+let paused = false;
+let currentLevel = 1;
+const levelNames = ["进山伏虎","入水斩蛟","自省除己"];
+
+// 状态定义
+const STATUS = {
+  BLEED: {name:"流血",color:"#c44",desc:"回合结束扣血，层数递减",isBuff:false},
+  TREMBLE: {name:"震颤",color:"#84c",desc:"叠满5层爆发，增加崩解条",isBuff:false},
+  FRAGILE: {name:"脆弱",color:"#ec4",desc:"受到伤害+30%，回合结束清除",isBuff:false},
+  DEF_DOWN: {name:"防御下降",color:"#48c",desc:"拼点威力-2，回合结束清除",isBuff:false},
+  PANIC: {name:"混乱Panic",color:"#a22",desc:"SP≤-30，硬币正面概率大幅降低",isBuff:false},
+  SELF_REFLECT: {name:"自省",color:"#4ce",desc:"本回合拼点威力+3；回合结束后SP-5",isBuff:true},
+  STABLE: {name:"稳固",color:"#4c8",desc:"抵挡下一次受到的负面状态，抵挡后消失",isBuff:true}
+};
+
+// 战斗统计对象
+let battleStat = {
+  dmgOut:0, dmgIn:0, win:0, lose:0, draw:0, staggerCount:0, spDelta:0, round:0
+};
+function resetStat(){
+  battleStat = {dmgOut:0, dmgIn:0, win:0, lose:0, draw:0, staggerCount:0, spDelta:0, round:0};
+  updateStatUI();
+  document.getElementById("battleLog").innerHTML = "";
+}
+function addLog(text){
+  const logBox = document.getElementById("battleLog");
+  const t = new Date().toLocaleTimeString();
+  logBox.innerHTML += `[${t}] ${text}<br/>`;
+  logBox.scrollTop = logBox.scrollHeight;
+}
+function updateStatUI(){
+  document.getElementById("statDmgOut").innerText = battleStat.dmgOut;
+  document.getElementById("statDmgIn").innerText = battleStat.dmgIn;
+  document.getElementById("statWin").innerText = battleStat.win;
+  document.getElementById("statLose").innerText = battleStat.lose;
+  document.getElementById("statDraw").innerText = battleStat.draw;
+  document.getElementById("statStagger").innerText = battleStat.staggerCount;
+  document.getElementById("statSpDelta").innerText = battleStat.spDelta;
+  document.getElementById("statRound").innerText = battleStat.round;
+}
+
+// 玩家数据
+const player = {
+  hp:100, maxHp:100,
+  stagger:0, maxStagger:100,
+  sp:0, spMin:-45, spMax:45,
+  speed:0,
+  skills:[],
+  status:{},
+  passive:"自新之志",
+  panic:false
+};
+let enemy = null;
+let enemySkills = [];
+let selectedSkill = null;
+let pair = null;
+let roundAnim = null;
+let roundLock = false;
+let lastPlayerSkillIdx = -1;
+let egoCooldown = 0; // EGO冷却
+
+// 硬币动画
+let coinAnimations = [];
+function spawnCoinAnimation(result, x, y){
+  coinAnimations.push({
+    result,
+    x, y,
+    start: performance.now(),
+    duration: 420,
+    done: false,
+    doneTime:0
+  });
+}
+function drawCoinAnimations(){
+  const now = performance.now();
+  for(let i = coinAnimations.length - 1; i >= 0; i--){
+    const c = coinAnimations[i];
+    const p = Math.min(1, (now - c.start) / c.duration);
+    const r = Math.PI * 2 * p * 6;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(Math.cos(r), 1);
+    if(Math.cos(r) < 0) ctx.rotate(Math.PI);
+    if(p >= 1){
+      c.done = true;
+      ctx.fillStyle = c.result ? "#ffd740" : "#444";
+    }else{
+      ctx.fillStyle = "#ffd740";
+    }
+    ctx.beginPath();
+    ctx.arc(0,0,28,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=2;
+    ctx.stroke();
+    ctx.fillStyle="#111";
+    ctx.font="20px KaiTi";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    if(p>=1){
+      ctx.fillText(c.result?"正":"反",0,0);
+    }
+    ctx.restore();
+    if(c.done){
+      c.doneTime +=16;
+      if(c.doneTime > 260){
+        coinAnimations.splice(i,1);
+      }
+    }
+  }
+}
+
+function makeSkill(name, base, coinCount, plus, desc, tag="", special=null){
+  return {name,base,coinCount,plus,desc,rolls:[],tag,special};
+}
+const playerSkillList = [
+  makeSkill("斩击",4,2,3,"稳定双硬币，拼点胜利给敌方叠加流血2层","怒",{
+    type:"slash",
+    onWin: function(self, target){
+      target.status.BLEED = (target.status.BLEED||0)+2;
+      addLog(`斩击命中，敌人流血+2`);
+    }
+  }),
+  makeSkill("猛击",7,1,4,"单枚高威力硬币，拼点胜利对崩解目标伤害+50%","怒",{
+    type:"heavy",
+    onWin: function(self, target, dmgObj){
+      if(target.staggered){
+        dmgObj.multi *= 1.5;
+        addLog(`猛击打击崩解目标！伤害增幅50%`);
+      }
+    }
+  }),
+  makeSkill("格挡",5,1,2,"拼点失败承伤降低60%；获得稳固，抵挡下一次负面效果","怠",{
+    type:"guard",
+    onLose: function(self, dmgObj){
+      dmgObj.multi *= 0.4;
+      addLog(`格挡生效，大幅降低受到的伤害`);
+    },
+    afterResolve: function(self, unit){
+      unit.status.STABLE = 1;
+    }
+  }),
+  makeSkill("自省EGO",9,3,2,"3枚强力硬币，清除流血/震颤/脆弱/防御下降，获得自省；需要SP≥15，冷却3回合","悲",{
+    type:"ego",
+    requireSp:15,
+    cooldown:3,
+    onCast: function(self, unit){
+      delete unit.status.BLEED;
+      delete unit.status.TREMBLE;
+      delete unit.status.FRAGILE;
+      delete unit.status.DEF_DOWN;
+      unit.status.SELF_REFLECT = 1;
+      addLog(`自省EGO发动！清除全部负面，获得【自省】`);
+      unit.sp = Math.max(unit.spMin, unit.sp - 25);
+      egoCooldown = 3;
+    }
+  })
+];
+
+function createEnemy(lv){
+  if(lv===1){
+    return {
+      name:"南山猛虎",hp:90,maxHp:90,stagger:0,maxStagger:100,staggered:false,
+      speedMin:2,speedMax:5,
+      passive:"凶性狂猎：血量低于40%，速度+2；扑击命中附加流血",
+      skills:[
+        makeSkill("扑击",4,2,3,"流血攻击","怒"),
+        makeSkill("低吼防御",5,1,2,"稳固拼点","怠")
+      ],
+      status:{},
+      panic:false
+    }
+  }else if(lv===2){
+    return {
+      name:"长桥蛟龙",hp:110,maxHp:110,stagger:0,maxStagger:100,staggered:false,
+      speedMin:4,speedMax:7,
+      passive:"水涡缠缚：拼点胜利给目标叠加震颤",
+      skills:[
+        makeSkill("浪袭",5,3,2,"三枚硬币拉锯","怠"),
+        makeSkill("甩尾",7,1,4,"单点爆发","怒")
+      ],
+      status:{},
+      panic:false
+    }
+  }else{
+    return {
+      name:"心魔",hp:120,maxHp:120,stagger:0,maxStagger:100,staggered:false,
+      speedMin:3,speedMax:6,
+      passive:"自我回响：复制上一轮周处使用的技能；善念回复SP，恶念削减SP",
+      skills:[
+        makeSkill("恶念",6,2,3,"心魔攻击","怒"),
+        makeSkill("善念",4,2,2,"可以用来回血、净化SP","悲")
+      ],
+      status:{},
+      panic:false
+    }
+  }
+}
+
+function startGame(){
+  currentLevel=1;
+  resetBattle();
+  showPage('page-game');
+  gameRunning=true;
+  paused=false;
+  requestAnimationFrame(loop);
+}
+function resetBattle(){
+  player.hp=player.maxHp;
+  player.stagger=0;
+  player.sp=0;
+  player.skills = JSON.parse(JSON.stringify(playerSkillList));
+  player.status = {};
+  player.panic = false;
+  enemy = createEnemy(currentLevel);
+  enemySkills = JSON.parse(JSON.stringify(enemy.skills));
+  selectedSkill=null;
+  pair=null;
+  roundAnim=null;
+  roundLock=false;
+  lastPlayerSkillIdx=-1;
+  egoCooldown = 0;
+  coinAnimations = [];
+  resetStat();
+  updateUI();
+  renderSkillPanel();
+  setTip();
+  renderAllStatus();
+}
+function pauseGame(){paused=!paused;}
+function backHome(){gameRunning=false;paused=false;showPage('page-home');}
+function restartGame(){closeModal();startGame();}
+function setTip(){
+  const t = document.getElementById('gameTip');
+  if(currentLevel===1) t.innerText="猛虎【凶性狂猎】残血提速，扑击命中挂流血";
+  else if(currentLevel===2) t.innerText="蛟龙【水涡缠缚】拼赢会给你叠震颤，震颤爆发增加崩解条";
+  else t.innerText="心魔【自我回响】复制你上一轮技能；善念可以稳住SP";
+}
+function updateUI(){
+  document.getElementById('levelName').innerText = levelNames[currentLevel-1];
+  document.getElementById('hpBar').style.width = (player.hp/player.maxHp*100)+"%";
+  document.getElementById('staggerBar').style.width = (player.stagger/player.maxStagger*100)+"%";
+  const spPct = ((player.sp-player.spMin)/(player.spMax-player.spMin))*100;
+  document.getElementById('spBar').style.width = spPct+"%";
+  renderAllStatus();
+}
+
+// 渲染状态盒子
+function renderAllStatus(){
+  renderStatusBox("playerStatusBox", player);
+  renderStatusBox("enemyStatusBox", enemy);
+}
+function renderStatusBox(boxId, unit){
+  const box = document.getElementById(boxId);
+  let html = "";
+  const stList = Object.entries(unit.status).filter(([k,v])=>v>0);
+  if(unit.panic) stList.push(["PANIC",1]);
+  if(stList.length === 0){
+    box.innerHTML = `<span class="no-status">无状态</span>`;
+    return;
+  }
+  for(let [key,stack] of stList){
+    const s = STATUS[key];
+    html += `<span class="status-tag" data-tip="${s.desc}">
+      <span class="dot" style="background:${s.color}"></span>
+      ${s.name} ×${stack}
+    </span>`
+  }
+  box.innerHTML = html;
+}
+
+// 渲染玩家技能面板 + 悬浮提示
+function renderSkillPanel(){
+  const p = document.getElementById("skillPanel");
+  p.innerHTML = "";
+  player.skills.forEach((sk,idx)=>{
+    const div = document.createElement("span");
+    let extraTip = "";
+    let warnText = "";
+    if(sk.special?.type === "ego"){
+      if(egoCooldown>0) {
+        extraTip = ` [冷却${egoCooldown}]`;
+        warnText = `⚠️ 冷却剩余 ${egoCooldown} 回合`;
+      }else {
+        extraTip = ` [需SP≥15]`;
+        warnText = `⚠️ 释放最低SP要求：15`;
+      }
+    }
+    div.className = "skill-card"+(selectedSkill===idx?" selected":"");
+    div.innerText = `${sk.name} 基础${sk.base} C${sk.coinCount}${extraTip}`;
+    // 悬浮提示DOM
+    const tipDom = document.createElement("div");
+    tipDom.className = "skill-tip";
+    tipDom.innerHTML = `
+      <h4>${sk.name}</h4>
+      <div class="tag">罪孽标签：${sk.tag}</div>
+      <div>基础威力：${sk.base} | 硬币数：${sk.coinCount} | 硬币加成：${sk.plus}</div>
+      <div style="margin-top:6px;">${sk.desc}</div>
+      ${warnText ? `<div class="warn" style="margin-top:6px;">${warnText}</div>` : ""}
+    `;
+    div.appendChild(tipDom);
+    div.onclick = ()=>{
+      selectedSkill=idx;
+      pair=null;
+      renderSkillPanel();
+    };
+    p.appendChild(div);
+  })
+  document.getElementById("btnExecute").disabled = (pair===null || roundLock);
+}
+function clearPair(){pair=null;renderSkillPanel();}
+
+function rollCoin(sp, isPanic){
+  let baseRate = 0.5 + (sp / 90);
+  if(isPanic) baseRate -= 0.35;
+  const rate = Math.max(0.1, Math.min(0.9, baseRate));
+  return Math.random()<rate;
+}
+
+async function matchCoins(pSkill, eSkill, pSp, eSp, pPanic, ePanic){
+  let pCoins = pSkill.coinCount;
+  let eCoins = eSkill.coinCount;
+  let pBase = pSkill.base;
+  let eBase = eSkill.base;
+  let pPlus = pSkill.plus;
+  let ePlus = eSkill.plus;
+  let pRolls = [];
+  let eRolls = [];
+  let pWinRound = false;
+  while(pCoins>0 && eCoins>0){
+    const ph = rollCoin(pSp, pPanic);
+    const eh = rollCoin(eSp, ePanic);
+    spawnCoinAnimation(ph, 260, 260);
+    spawnCoinAnimation(eh, 460, 260);
+    const pVal = pBase + (ph ? pPlus : 0);
+    const eVal = eBase + (eh ? ePlus : 0);
+    pRolls.push(ph);
+    eRolls.push(eh);
+    if(pVal > eVal){
+      eCoins--;
+      pWinRound = true;
+    }else if(eVal > pVal){
+      pCoins--;
+      pWinRound = false;
+    }else{
+      pCoins--;
+      eCoins--;
+    }
+    await sleep(450);
+  }
+  return {pWin:pCoins>0, pRemain:pCoins, eRemain:eCoins, pRolls, eRolls};
+}
+
+function resolveStatus(target){
+  if(target.status.BLEED && target.status.BLEED>0){
+    const dmg = target.status.BLEED * 2;
+    target.hp -= dmg;
+    addLog(`【流血】${target.name}受到${dmg}点流血伤害`);
+    target.status.BLEED = Math.max(0, target.status.BLEED - 1);
+    if(target === player) battleStat.dmgIn += dmg;
+    else battleStat.dmgOut += dmg;
+  }
+  if(target.status.TREMBLE && target.status.TREMBLE >=5){
+    target.stagger += 12;
+    addLog(`【震颤爆发】${target.name}崩解值+12`);
+    target.status.TREMBLE = 0;
+    battleStat.staggerCount +=1;
+  }
+  delete target.status.FRAGILE;
+  delete target.status.DEF_DOWN;
+}
+
+async function executeRound(){
+  if(roundLock || !pair) return;
+  roundLock=true;
+  document.getElementById("btnExecute").disabled=true;
+  const pSk = player.skills[pair.playerSkill];
+  const eSk = enemySkills[pair.enemySkill];
+  lastPlayerSkillIdx = pair.playerSkill;
+  battleStat.round +=1;
+
+  // EGO前置校验
+  if(pSk.special?.type === "ego"){
+    if(player.sp < pSk.special.requireSp || egoCooldown > 0){
+      addLog(`自省EGO无法释放！${egoCooldown>0?"冷却中":"SP不足15"}`);
+      roundLock=false;
+      updateUI();
+      renderSkillPanel();
+      return;
+    }
+    pSk.special.onCast(pSk, player);
+  }
+
+  player.speed = rand(enemy.speedMin,enemy.speedMax);
+  let eSpeed = rand(enemy.speedMin,enemy.speedMax);
+  if(currentLevel===1 && enemy.hp <= enemy.maxHp*0.4) eSpeed += 2;
+
+  player.panic = player.sp <= -30;
+  enemy.panic = enemy.sp <= -30;
+
+  roundAnim = {pSk,eSk,phase:"roll"};
+  const matchRes = await matchCoins(pSk, eSk, player.sp, 0, player.panic, enemy.panic);
+  roundAnim.matchRes = matchRes;
+
+  await sleep(700);
+  let dmgMult = 1;
+  if(player.status.FRAGILE) dmgMult *=1.3;
+  let baseBonus = player.status.SELF_REFLECT ? 3 : 0;
+  let defPen = player.status.DEF_DOWN ? -2 : 0;
+
+  let spBefore = player.sp;
+  let dmgCalc = {multi:1};
+  if(matchRes.pWin){
+    battleStat.win +=1;
+    let dmg = Math.max(2, (pSk.base + baseBonus + pSk.plus * matchRes.pRolls.filter(x=>x).length) * 0.7);
+    if(enemy.staggered) dmg *=1.6;
+    if(pSk.special?.onWin) pSk.special.onWin(pSk, enemy, dmgCalc);
+    dmg *= dmgCalc.multi;
+    enemy.hp -= dmg;
+    enemy.stagger += 16;
+    battleStat.dmgOut += dmg;
+    addLog(`拼点胜利！对${enemy.name}造成${Math.floor(dmg)}伤害`);
+
+    if(player.sp < 0) player.sp = Math.min(player.spMax, player.sp + 8);
+    else player.sp = Math.min(player.spMax, player.sp + 5);
+
+    if(currentLevel===2) { player.status.TREMBLE = (player.status.TREMBLE||0)+2; addLog(`【水涡缠缚】周处震颤+2`); }
+    if(currentLevel===1 && eSk.name==="扑击") {
+      if(player.status.STABLE){
+        delete player.status.STABLE;
+        addLog(`【稳固】抵挡流血！`);
+      }else{
+        player.status.BLEED = (player.status.BLEED||0)+3;
+        addLog(`【扑击】周处流血+3`);
+      }
+    }
+    if(currentLevel===3 && eSk.name==="善念"){
+      player.hp = Math.min(player.maxHp, player.hp + 10);
+      player.sp = Math.min(player.spMax, player.sp + 10);
+      addLog(`【善念】周处回血10、SP+10`);
+    }
+  }else{
+    if(matchRes.pRemain===0 && matchRes.eRemain===0) battleStat.draw +=1;
+    else battleStat.lose +=1;
+    let dmg = Math.max(2, (eSk.base + eSk.plus * matchRes.eRolls.filter(x=>x).length) * 0.7 * dmgMult);
+    let dmgObj = {multi:1};
+    if(pSk.special?.onLose) pSk.special.onLose(pSk, dmgObj);
+    dmg *= dmgObj.multi;
+    if(player.staggered) dmg *=1.4;
+    player.hp -= dmg;
+    player.stagger += 16;
+    battleStat.dmgIn += dmg;
+    addLog(`拼点落败！周处受到${Math.floor(dmg)}伤害`);
+    player.sp = Math.max(player.spMin, player.sp - 6);
+    if(currentLevel===3 && eSk.name==="恶念") { player.sp = Math.max(player.spMin, player.sp - 8); addLog(`【恶念】SP额外-8`); }
+  }
+  if(pSk.special?.afterResolve) pSk.special.afterResolve(pSk, player);
+
+  let spAfter = player.sp;
+  battleStat.spDelta += (spAfter - spBefore);
+
+  if(enemy.stagger >= enemy.maxStagger){
+    enemy.staggered = true;
+    enemy.stagger = enemy.maxStagger;
+    battleStat.staggerCount +=1;
+    addLog(`敌人崩解！`);
+  }else enemy.staggered = false;
+  if(player.stagger >= player.maxStagger){
+    player.stagger = player.maxStagger;
+  }
+
+  resolveStatus(player);
+  resolveStatus(enemy);
+  if(player.status.SELF_REFLECT){
+    player.sp = Math.max(player.spMin, player.sp -5);
+    addLog(`【自省】效果结束，SP-5`);
+    delete player.status.SELF_REFLECT;
+  }
+  if(egoCooldown>0) egoCooldown--;
+
+  await sleep(600);
+  roundAnim=null;
+  pair=null;
+  selectedSkill=null;
+  roundLock=false;
+  updateUI();
+  renderSkillPanel();
+  updateStatUI();
+  checkBattleEnd();
+}
+
+function checkBattleEnd(){
+  if(player.hp <= 0){
+    gameRunning=false;
+    document.getElementById('failModal').classList.add('show');
+    addLog("周处倒下，挑战失败");
+    return;
+  }
+  if(enemy.hp <=0){
+    if(currentLevel >=3){
+      gameRunning=false;
+      setTimeout(()=>showPage('page-end'),400);
+      addLog("心魔已除，三害尽灭！");
+      return;
+    }
+    currentLevel++;
+    addLog(`${enemy.name}被击败，进入下一关！`);
+    resetBattle();
+  }
+}
+
+function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+canvas.onclick = function(e){
+  if(!gameRunning || paused || roundLock || selectedSkill===null) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  enemySkills.forEach((sk,idx)=>{
+    const sx = 120+idx*140, sy=70, sw=110, sh=60;
+    if(mx>sx && mx<sx+sw && my>sy && my<sy+sh){
+      pair = {playerSkill:selectedSkill, enemySkill:idx};
+      renderSkillPanel();
+    }
+  })
+}
+
+function draw(){
+  ctx.fillStyle="#191714";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(!enemy) return;
+
+  ctx.fillStyle="#fff";
+  ctx.font="22px KaiTi";
+  ctx.textAlign="center";
+  ctx.fillText(enemy.name, canvas.width/2, 32);
+  ctx.font="14px KaiTi";
+  ctx.fillStyle="#f8b860";
+  ctx.fillText(enemy.passive, canvas.width/2, 52);
+
+  drawBar(canvas.width/2-120,60,240,14,enemy.hp/enemy.maxHp,"#c84c4c");
+  drawBar(canvas.width/2-120,78,240,10,enemy.stagger/enemy.maxStagger,"#9c58c8");
+
+  ctx.fillStyle="#633";
+  ctx.beginPath();ctx.arc(360,160,70,0,Math.PI*2);ctx.fill();
+
+  enemySkills.forEach((sk,idx)=>{
+    const x = 120+idx*140, y=80, w=110, h=60;
+    ctx.fillStyle = (pair && pair.enemySkill===idx) ? "#5a4a30" : "#332a20";
+    ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle="#ffd343";
+    ctx.lineWidth=pair&&pair.enemySkill===idx?3:2;
+    ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle="#fff";
+    ctx.font="14px KaiTi";ctx.textAlign="center";
+    ctx.fillText(sk.name, x+w/2, y+18);
+    ctx.fillText(`基础${sk.base} C${sk.coinCount}`, x+w/2, y+40);
+
+    // 敌方技能悬浮提示
+    const rect = canvas.getBoundingClientRect();
+    canvas.onmousemove = function(ev){
+      const mx = ev.clientX - rect.left;
+      const my = ev.clientY - rect.top;
+      if(mx>x && mx<x+w && my>y && my<y+h){
+        canvas.title = `${sk.name}｜罪孽:${sk.tag}｜${sk.desc}`;
+      }
+    }
+  })
+
+  if(roundAnim){
+    const a = roundAnim;
+    ctx.fillStyle="#ffd343";
+    ctx.font="24px KaiTi";
+    ctx.textAlign="center";
+    if(a.matchRes){
+      ctx.fillText(`拼点${a.matchRes.pWin?"胜利！":"落败..."}`, canvas.width/2, 240);
+      ctx.fillText(`我方剩余硬币:${a.matchRes.pRemain} 敌方剩余硬币:${a.matchRes.eRemain}`, canvas.width/2, 270);
+    }else{
+      ctx.fillText("掷硬币中……", canvas.width/2, 240);
+    }
+  }else{
+    ctx.fillStyle="#aaa";
+    ctx.font="16px KaiTi";
+    ctx.textAlign="center";
+    ctx.fillText(selectedSkill!==null?"点击上方敌方技能进行配对":"请先选择下方技能", canvas.width/2, 240);
+  }
+
+  ctx.fillStyle="#ddd";
+  ctx.font="20px KaiTi";
+  ctx.textAlign="left";
+  ctx.fillText("周处【自新之志】", 40, 340);
+  drawBar(80,322,180,14,player.hp/player.maxHp,"#c84c4c");
+  drawBar(80,342,180,10,player.stagger/player.maxStagger,"#9c58c8");
+  drawBar(80,358,180,10, (player.sp-player.spMin)/(player.spMax-player.spMin),"#4c98c8");
+  ctx.fillText(`SP:${player.sp}`, 280, 360);
+
+  drawCoinAnimations();
+}
+function drawBar(x,y,w,h,rate,color){
+  ctx.fillStyle="#222";
+  ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=color;
+  ctx.fillRect(x,y,w*Math.max(0,Math.min(1,rate)),h);
+  ctx.strokeStyle="#888";
+  ctx.lineWidth=1;
+  ctx.strokeRect(x,y,w,h);
+}
+
+function loop(t){
+  if(!gameRunning) return;
+  if(!paused){
+    draw();
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
